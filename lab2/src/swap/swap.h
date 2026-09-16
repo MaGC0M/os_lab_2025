@@ -1,2 +1,2 @@
 
-void Swap(char *left, char *right);
+void Swap(char *a, char *b);
