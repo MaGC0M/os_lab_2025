@@ -40,22 +40,42 @@ int main(int argc, char **argv) {
       switch (option_index) {
         case 0:
           threads_num = atoi(optarg);
+          if (threads_num <= 0) {
+            printf("threads_num must be positive\n");
+            return 1;
+          }
           break;
 
         case 1:
           seed = atoi(optarg);
+          if (seed <= 0) {
+            printf("seed must be positive\n");
+            return 1;
+          }
           break;
 
         case 2:
           array_size = atoi(optarg);
+          if (array_size <= 0) {
+            printf("array_size must be positive\n");
+            return 1;
+          }
           break;
       }
+    } else {
+      return 1;
     }
   }
 
-  if (threads_num <= 0 || seed <= 0 || array_size <= 0) {
+  if (optind < argc) {
+    printf("Has at least one non-option argument\n");
+    return 1;
+  }
+
+  if (threads_num == -1 || seed == -1 || array_size == -1) {
     printf(
-        "Usage: %s --threads_num \"num\" --seed \"num\" --array_size \"num\"\n",
+        "Usage: %s --threads_num \"num\" --seed \"num\" "
+        "--array_size \"num\"\n",
         argv[0]
     );
     return 1;
@@ -69,24 +89,32 @@ int main(int argc, char **argv) {
   }
 
   /*
-   * Генерация массива не входит в замер времени.
+   * Генерация массива происходит ДО начала замера времени.
    */
   GenerateArray(array, array_size, seed);
 
-  pthread_t *threads = malloc(sizeof(pthread_t) * threads_num);
-  struct SumArgs *args = malloc(sizeof(struct SumArgs) * threads_num);
+  pthread_t *threads =
+      malloc(sizeof(pthread_t) * threads_num);
+
+  struct SumArgs *args =
+      malloc(sizeof(struct SumArgs) * threads_num);
 
   if (threads == NULL || args == NULL) {
     perror("malloc");
+
     free(threads);
     free(args);
     free(array);
+
     return 1;
   }
 
   struct timeval start_time;
   struct timeval finish_time;
 
+  /*
+   * Начинаем измерять время только после генерации массива.
+   */
   gettimeofday(&start_time, NULL);
 
   for (int i = 0; i < threads_num; i++) {
@@ -106,7 +134,7 @@ int main(int argc, char **argv) {
             ThreadSum,
             &args[i]
         ) != 0) {
-      printf("pthread_create failed\n");
+      printf("Error: pthread_create failed!\n");
 
       free(args);
       free(threads);
@@ -119,6 +147,9 @@ int main(int argc, char **argv) {
   long long total_sum = 0;
 
   for (int i = 0; i < threads_num; i++) {
+    /*
+     * Ждём завершения каждого потока.
+     */
     pthread_join(threads[i], NULL);
 
     total_sum += args[i].result;
